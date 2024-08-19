@@ -1,6 +1,8 @@
+import { CANVAS, COLOR } from "./settings";
+
 new p5((p) => {
     p.setup = () => {
-        p.createCanvas(400, 400);
-        p.background(0);
+        p.createCanvas(CANVAS.WIDTH, CANVAS.HEIGHT);
+        p.background(COLOR.BLACK);
     };
 });
