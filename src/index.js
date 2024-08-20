@@ -5,4 +5,6 @@ new p5((p) => {
         p.createCanvas(CANVAS.WIDTH, CANVAS.HEIGHT);
         p.background(COLOR.BLACK);
     };
+
+    p.draw = () => {};
 });
