@@ -1,10 +1,4 @@
-import { CANVAS, COLOR } from "./settings";
+import p5 from "p5";
+import { sketch } from "./sketch/main";
 
-new p5((p) => {
-    p.setup = () => {
-        p.createCanvas(CANVAS.WIDTH, CANVAS.HEIGHT);
-        p.background(COLOR.BLACK);
-    };
-
-    p.draw = () => {};
-});
+new p5(sketch);
