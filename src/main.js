@@ -1,121 +1,85 @@
 import { CANVAS, COLOR, SHADER } from "./settings";
+import { vs_1, fs_1, vs_2, fs_2 } from "./shader";
 
 /*-----------------------------------------------------------------------*/
 
-let physarumShader;
-let oldTrailMap, newTrailMap;
+let shader1, shader2;
+let buffer1, buffer2;
+
+const pixels = new Uint8Array(CANVAS.WIDTH * CANVAS.HEIGHT * 4);
 
 /*-----------------------------------------------------------------------*/
 
 export const sketch = (p) => {
-    p.preload = () => {
-        physarumShader = p.loadShader(
-            `${SHADER.PATH}.vert`,
-            `${SHADER.PATH}.frag`,
-
-            () => console.log("Shader loaded successfully"),
-            (err) => console.error("Error loading shader:", err)
-        );
-    };
-
-    /*--------------------*/
-
     p.setup = () => {
         p.createCanvas(CANVAS.WIDTH, CANVAS.HEIGHT, p.WEBGL);
         p.frameRate(CANVAS.FRAME_RATE);
+        p.noStroke();
 
         init();
     };
 
     /*--------------------*/
 
-    p.draw = () => {
-        setShaderUniforms();
-
-        physarumShader.setUniform("oldTrailMap", oldTrailMap);
-        physarumShader.setUniform("newTrailMap", newTrailMap);
-
-        newTrailMap.shader(physarumShader);
-        newTrailMap.rect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
-
-        p.translate(-CANVAS.WIDTH / 2, -CANVAS.HEIGHT / 2);
-        p.image(newTrailMap, 0, 0);
-
-        swap(newTrailMap, oldTrailMap);
-    };
-
-    /*--------------------*/
-
     const init = () => {
-        oldTrailMap = createTrailMap(CANVAS.WIDTH, CANVAS.HEIGHT);
-        newTrailMap = createTrailMap(CANVAS.WIDTH, CANVAS.HEIGHT);
+        shader1 = p.createShader(vs_1, fs_1);
+        shader2 = p.createShader(vs_2, fs_2);
 
-        p.shader(physarumShader);
-        p.textureMode(p.NORMAL);
+        buffer1 = createBuffer(CANVAS.WIDTH, CANVAS.HEIGHT);
+        buffer2 = createBuffer(CANVAS.WIDTH, CANVAS.HEIGHT);
     };
 
-    const createTrailMap = (width, height) => {
-        const map = p.createGraphics(width, height, p.WEBGL);
-        map.pixelDensity(1);
-        map.noStroke();
+    const createBuffer = (width, height) => {
+        const buffer = p.createGraphics(width, height, p.WEBGL);
+        buffer.noStroke();
+        buffer.pixelDensity(1);
 
-        return map;
+        return buffer;
     };
 
     /*--------------------*/
 
-    const setShaderUniforms = () => {
-        // Update uniforms for the shader
-        physarumShader.setUniform("screenWidth", CANVAS.WIDTH);
-        physarumShader.setUniform("screenHeight", CANVAS.HEIGHT);
-        physarumShader.setUniform("decayRate", SHADER.UNIFORM.DECAY_RATE);
-        physarumShader.setUniform("diffuseRate", SHADER.UNIFORM.DIFFUSE_RATE);
-        physarumShader.setUniform("senseAngle", SHADER.UNIFORM.SENSE_ANGLE);
-        physarumShader.setUniform(
-            "steerStrength",
-            SHADER.UNIFORM.STEER_STRENGTH
-        );
-        physarumShader.setUniform(
-            "senseDistance",
-            SHADER.UNIFORM.SENSE_DISTANCE_RATIO * (CANVAS.WIDTH + CANVAS.HEIGHT)
-        );
-        physarumShader.setUniform(
-            "speed",
-            SHADER.UNIFORM.SPEED_RATIO * (CANVAS.WIDTH + CANVAS.HEIGHT)
-        );
-        physarumShader.setUniform(
-            "maxTrailDensity",
-            SHADER.UNIFORM.MAX_TRAIL_DENSITY
-        );
-        physarumShader.setUniform("densitySpeed", SHADER.UNIFORM.DENSITY_SPEED);
-        physarumShader.setUniform("sensorSize", SHADER.UNIFORM.SENSOR_SIZE);
-        physarumShader.setUniform(
-            "speedAffectedByTrailDensity",
-            SHADER.UNIFORM.SPEED_AFFECTED_BY_TRAIL_DENSITY
-        );
-        physarumShader.setUniform("deltaTime", SHADER.UNIFORM.DELTA_TIME);
+    p.draw = () => {
+        applyShader1();
+        applyShader2();
 
-        // Apply colors
-        physarumShader.setUniform("teamColor1", normalizeRGBA(COLOR.WHITE)); // Red
-        physarumShader.setUniform("teamColor2", normalizeRGBA(COLOR.WHITE)); // Green
-        physarumShader.setUniform("teamColor3", normalizeRGBA(COLOR.WHITE)); // Blue
-        physarumShader.setUniform("teamColor4", normalizeRGBA(COLOR.WHITE)); // Yellow
-        physarumShader.setUniform("baseColor", normalizeRGBA(COLOR.WHITE)); // Base gray
-
-        // Set textures
-        physarumShader.setUniform("oldTrailMap", oldTrailMap);
-        physarumShader.setUniform("newTrailMap", newTrailMap);
+        p.image(buffer1, 0, 0);
+        p.image(buffer2, CANVAS.WIDTH / 2, CANVAS.WIDTH / 2);
     };
 
-    const swap = (a, b) => {
-        let temp = a;
-        a = b;
-        b = temp;
+    /*--------------------*/
 
-        return [a, b];
+    const applyShader1 = () => {
+        shader1.setUniform("uTexture0", buffer1);
+        shader1.setUniform("uTexture1", buffer2);
+
+        shader1.setUniform("speedMultiplier", 1.0);
+        shader1.setUniform("randomSteerFactor", 0.2);
+        shader1.setUniform("constantSteerFactor", 0.4);
+        shader1.setUniform("searchRadius", 0.01);
+        shader1.setUniform("senseAngle", 0.2);
+        shader1.setUniform("trailStrength", 0.2);
+        shader1.setUniform("vertexRadius", 1.0);
+        shader1.setUniform("wallStrategy", SHADER.UNIFORM.WALL_STRATEGY.BOUNCE);
+        shader1.setUniform("colorStrategy", SHADER.UNIFORM.COLOR_STRATEGY.GRAY);
+
+        // Bind textures and draw with Shader 1
+        buffer1.shader(shader1);
+        buffer1.rect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
     };
-};
 
-const normalizeRGBA = (color) => {
-    return color._array;
+    /*--------------------*/
+
+    const applyShader2 = () => {
+        shader2.setUniform("uTexture0", buffer1);
+        shader2.setUniform("uTexture1", buffer2);
+
+        shader2.setUniform("uTime", p.millis() / 1000.0);
+        shader2.setUniform("uFadeSpeed", SHADER.UNIFORM.FADE_SPEED);
+        shader2.setUniform("uBlurFraction", SHADER.UNIFORM.BLUR_FRACTION);
+
+        // Draw with Shader 2
+        buffer2.shader(shader2);
+        buffer2.rect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
+    };
 };

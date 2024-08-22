@@ -10,8 +10,6 @@ export const COLOR = {
 };
 
 export const SHADER = {
-    PATH: "shader/physarum",
-
     UNIFORM: {
         DECAY_RATE: 0.02,
         DIFFUSE_RATE: 0.8,
@@ -24,5 +22,17 @@ export const SHADER = {
         SENSOR_SIZE: 1,
         SPEED_AFFECTED_BY_TRAIL_DENSITY: true,
         DELTA_TIME: 0.01,
+        WALL_STRATEGY: {
+            WRAP: 0,
+            BOUNCE: 1,
+        },
+        COLOR_STRATEGY: {
+            POSITION: 0,
+            DIRECTION: 1,
+            GRAY: 2,
+            SPEED: 3,
+        },
+        FADE_SPEED: 0.05,
+        BLUR_FRACTION: 1.0,
     },
 };
