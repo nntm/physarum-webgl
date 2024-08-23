@@ -1,4 +1,4 @@
-import { CANVAS, COLOR, SHADER } from "./settings";
+import { CANVAS, COLOR, PHYSARUM } from "./settings";
 import { vs_1, fs_1, vs_2, fs_2 } from "./shader";
 
 /*-----------------------------------------------------------------------*/
@@ -6,7 +6,7 @@ import { vs_1, fs_1, vs_2, fs_2 } from "./shader";
 let shader1, shader2;
 let buffer1, buffer2;
 
-const pixels = new Uint8Array(CANVAS.WIDTH * CANVAS.HEIGHT * 4);
+let physarum;
 
 /*-----------------------------------------------------------------------*/
 
@@ -60,8 +60,8 @@ export const sketch = (p) => {
         shader1.setUniform("senseAngle", 0.2);
         shader1.setUniform("trailStrength", 0.2);
         shader1.setUniform("vertexRadius", 1.0);
-        shader1.setUniform("wallStrategy", SHADER.UNIFORM.WALL_STRATEGY.BOUNCE);
-        shader1.setUniform("colorStrategy", SHADER.UNIFORM.COLOR_STRATEGY.GRAY);
+        shader1.setUniform("wallStrategy", PHYSARUM.WALL_STRATEGY.BOUNCE);
+        shader1.setUniform("colorStrategy", PHYSARUM.COLOR_STRATEGY.GRAY);
 
         // Bind textures and draw with Shader 1
         buffer1.shader(shader1);
@@ -75,11 +75,38 @@ export const sketch = (p) => {
         shader2.setUniform("uTexture1", buffer2);
 
         shader2.setUniform("uTime", p.millis() / 1000.0);
-        shader2.setUniform("uFadeSpeed", SHADER.UNIFORM.FADE_SPEED);
-        shader2.setUniform("uBlurFraction", SHADER.UNIFORM.BLUR_FRACTION);
+        shader2.setUniform("uFadeSpeed", PHYSARUM.FADE_SPEED);
+        shader2.setUniform("uBlurFraction", PHYSARUM.BLUR_FRACTION);
 
         // Draw with Shader 2
         buffer2.shader(shader2);
         buffer2.rect(0, 0, CANVAS.WIDTH, CANVAS.HEIGHT);
     };
 };
+
+/*-----------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+/*-----------------------------------------------------------------------*/
+
+class Physarum {
+    constructor() {
+        this.initAgents();
+    }
+
+    /*--------------------*/
+
+    initAgents() {
+        this.agents = [];
+
+        for (let i = 0; i < PHYSARUM.NUM_AGENTS; i++) {}
+    }
+}
+
+/*-----------------------------------------------------------------------*/
+
+class Agent {
+    constructor(x, y) {
+        this.pos = { x: x, y: y };
+        this;
+    }
+}
