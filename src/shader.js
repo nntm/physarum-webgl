@@ -1,177 +1,121 @@
-export const vs_1 = `
-precision highp float;
+export const updateAgents_frag = `
+in vec2 v_uv;
 
-// Attributes
-attribute vec4 aPosition; // Vertex position
+#define TWO_PI 6.28318530718
 
-// Uniforms
-uniform sampler2D uTexture0; // Texture input from shader 1
-uniform sampler2D uTexture1; // Texture input from shader 2
-uniform float speedMultiplier;
-uniform float randomSteerFactor;
-uniform float constantSteerFactor;
-uniform float searchRadius;
-uniform float senseAngle;
-uniform float trailStrength;
-uniform float vertexRadius;
-uniform int wallStrategy;
-uniform int colorStrategy;
+uniform sampler2D u_agentsHeading;
+uniform sampler2D u_agentsPositions;
+uniform sampler2D u_trail;
+uniform vec2 u_dimensions;
+uniform float u_sensorAngle;
+uniform float u_sensorDistance;
+uniform float u_rotationAngle;
+uniform bool u_randomDir;
+uniform float u_stepSize;
 
-// Varying
-varying vec4 vColor; // Color passed to the fragment shader
+layout (location = 0) out float out_heading; // Output at index 0.
+layout (location = 1) out vec4 out_position; // Output at index 1.
 
-float rand(vec2 co) {
-    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+float sense(vec2 position, float angle) {
+    vec2 sensePosition = position + u_sensorDistance * vec2(cos(angle), sin(angle));
+    return texture(u_trail, sensePosition / u_dimensions).x;
 }
 
 void main() {
-    vec2 texcoord = vec2((aPosition.x + 1.0) / 2.0, (aPosition.y + 1.0) / 2.0);
-    vec4 texVal = texture2D(uTexture1, texcoord);
+    float heading = texture(u_agentsHeading, v_uv).r;
 
-    float direction = (aPosition.w - 1.0) * 1000.0;
-    float speedVar = aPosition.z * 1000.0;
+    // Add absolute position plus displacement to get position.
+    vec4 positionInfo = texture(u_agentsPositions, v_uv);
+    // Add absolute position plus displacement to get position.
+    vec2 absolute = positionInfo.xy;
+    vec2 displacement = positionInfo.zw;
+    vec2 position = absolute + displacement;
+    // Get location of particle in trail state (different that v_uv, which is UV coordinate in agents arrays).
+    vec2 trailUV = position / u_dimensions;
 
-    direction += randomSteerFactor * 3.0 * (rand(texcoord + texVal.xy) - 0.5);
+    // Sense and rotate.
+    float middleState = sense(position, heading);
+    float leftState = sense(position, heading + u_sensorAngle);
+    float rightState = sense(position, heading - u_sensorAngle);
+    // Using some tricks here to remove conditionals (they cause significant slowdowns).
+    // Leaving the old code here for clarity, replaced by the lines below.
+        // if (middleState > rightState && middleState < leftState) {
+        // 	// Rotate left.
+        // 	heading += u_rotationAngle;
+        // } else if (middleState < rightState && middleState > leftState) {
+        // 	// Rotate right.
+        // 	heading -= u_rotationAngle;
+        // } else if (middleState < rightState && middleState < leftState) {
+        // 	// Choose randomly.
+        // 	heading += u_rotationAngle * (u_randomDir ? 1.0 : -1.0);
+        // } // else do nothing.
+    // The following lines give the same result without conditionals.
+    float rightWeight = step(middleState, rightState);
+    float leftWeight = step(middleState, leftState);
+    heading += mix(
+        rightWeight * mix(u_rotationAngle, -u_rotationAngle, float(u_randomDir)),
+        mix(u_rotationAngle, -u_rotationAngle, rightWeight),
+        abs(leftWeight - rightWeight)
+    );
 
-    float speed = speedMultiplier * speedVar; 
+    // Wrap heading around 2PI.
+    heading = mod(heading + TWO_PI, TWO_PI);
+    out_heading = heading;
 
-    float senseLeft = texture2D(uTexture1, vec2(texcoord.x + cos(direction + senseAngle) * searchRadius, texcoord.y + sin(direction + senseAngle) * searchRadius)).b;
-    float senseRight = texture2D(uTexture1, vec2(texcoord.x + cos(direction - senseAngle) * searchRadius, texcoord.y + sin(direction - senseAngle) * searchRadius)).b;
-    float senseForward = texture2D(uTexture1, vec2(texcoord.x + cos(direction) * searchRadius, texcoord.y + sin(direction) * searchRadius)).b;
-
-    float steerAmount = constantSteerFactor + randomSteerFactor * rand(texcoord + texVal.xy);
+    // Move in direction of heading.
+    vec2 move = u_stepSize * vec2(cos(heading), sin(heading));
+    vec2 nextDisplacement = displacement + move;
     
-    if (senseForward > senseLeft && senseForward > senseRight) {
-        direction += 0.0;
-    } else if (senseForward < senseLeft && senseForward < senseRight) {
-        direction += randomSteerFactor * (rand(texcoord + texVal.xy) - 0.5);
-    } else if (senseRight > senseLeft) {
-        direction -= steerAmount;
-    } else if (senseRight < senseLeft) {
-        direction += steerAmount;
-    }
+    // If displacement is large enough, merge with abs position.
+    // This method reduces floating point error in position.
+    // Using some tricks here to remove conditionals (they cause significant slowdowns).
+    // Leaving the old code here for clarity, replaced by the lines below.
+        // if (dot(nextDisplacement, nextDisplacement) > 30.0) {
+        // 	absolute += nextDisplacement;
+        // 	nextDisplacement = vec2(0);
+        // 	// Also check if we've wrapped.
+        // 	if (absolute.x < 0.0) {
+        // 		absolute.x = absolute.x + u_dimensions.x;
+        // 	} else if (absolute.x >= u_dimensions.x) {
+        // 		absolute.x = absolute.x - u_dimensions.x;
+        // 	}
+        // 	if (absolute.y < 0.0) {
+        // 		absolute.y = absolute.y + u_dimensions.y;
+        // 	} else if (absolute.y >= u_dimensions.y) {
+        // 		absolute.y = absolute.y - u_dimensions.y;
+        // 	}
+        // }
+    // The following lines give the same result without conditionals.
+    float shouldMerge = step(30.0, dot(nextDisplacement, nextDisplacement));
+    absolute = mod(absolute + shouldMerge * nextDisplacement + u_dimensions, u_dimensions);
+    nextDisplacement *= (1.0 - shouldMerge);
 
-    float yNew = aPosition.y;
-    float xNew = aPosition.x; 
-
-    if (wallStrategy == 0) { // Wrap
-        if (yNew > 0.99) { yNew = -0.99; }
-        if (yNew < -0.99) { yNew = 0.99; }
-        if (xNew > 0.99) { xNew = -0.99; }
-        if (xNew < -0.99) { xNew = 0.99; }
-    } else if (wallStrategy == 1) { // Bounce
-        if (yNew + speed * sin(direction) > 0.90) {
-            float d = atan(sin(direction), cos(direction));
-            direction -= 2.0 * d;
-        }
-        if (yNew + speed * sin(direction) < -0.90) {
-            float d = atan(sin(direction), cos(direction));
-            direction -= 2.0 * d;
-        }
-        if (xNew + speed * cos(direction) > 0.90) {
-            float d = atan(cos(direction), sin(direction));
-            direction += 2.0 * d;
-        }
-        if (xNew + speed * cos(direction) < -0.90) {
-            float d = atan(cos(direction), sin(direction));
-            direction += 2.0 * d;
-        }
-    }
-
-    yNew += speed * speedMultiplier * sin(direction);
-    xNew += speed * speedMultiplier * cos(direction);
-
-    float r = 0.0;
-    float g = 0.0;
-
-    if (colorStrategy == 0) { // Position
-        r = abs(yNew) / 2.0 + 0.5;
-        g = abs(xNew) / 2.0 + 0.5;
-    } else if (colorStrategy == 1) { // Direction
-        r = sin(direction);
-        g = cos(direction);
-    } else if (colorStrategy == 2) { // Grey
-        r = trailStrength;
-        g = r;
-    } else if (colorStrategy == 3) { // Speed
-        r = speedVar * 50.0;
-        g = r;
-    }
-
-    vColor = vec4(r, g, trailStrength, 1.0);
-
-    gl_Position = vec4(xNew, yNew, speedVar / 1000.0, 1.0 + direction / 1000.0);
-    gl_PointSize = vertexRadius;
+    out_position = vec4(absolute, nextDisplacement);
 }
-`;
+    `;
 
-export const fs_1 = `
-precision highp float;
+export const diffuseAndDecay_frag = `
+in vec2 v_uv;
 
-// Varying from vertex shader
-varying vec4 vColor;
+uniform sampler2D u_trail;
+uniform float u_decayFactor;
+uniform vec2 u_pxSize;
+
+out float out_state;
 
 void main() {
-    gl_FragColor = vColor;
+    vec2 halfPx = u_pxSize / 2.0;
+    // Use built-in linear interpolation to reduce 9 samples to 4.
+    // This is not the same as the flat kernel described in Jones 2010.
+    // This kernel has weighting:
+    // 1/16 1/8 1/16
+    // 1/8  1/4  1/8
+    // 1/16 1/8 1/16
+    float prevStateNE = texture(u_trail, v_uv + halfPx).x;
+    float prevStateNW = texture(u_trail, v_uv + vec2(-halfPx.x, halfPx.y)).x;
+    float prevStateSE = texture(u_trail, v_uv + vec2(halfPx.x, -halfPx.y)).x;
+    float prevStateSW = texture(u_trail, v_uv - halfPx).x;
+    float diffusedState = (prevStateNE + prevStateNW + prevStateSE + prevStateSW) / 4.0;
+    out_state = u_decayFactor * diffusedState;
 }
-`;
-
-export const vs_2 = `
-precision highp float;
-
-// Attributes
-attribute vec3 aPosition;
-attribute vec2 aTexCoord;
-
-// Varying
-varying vec2 vTexCoord;
-
-void main() {
-    vTexCoord = aTexCoord;
-
-    vec4 positionVec4 = vec4(aPosition, 1.0);
-    positionVec4.xy = positionVec4.xy * 2.0 - 1.0;
-
-    gl_Position = positionVec4;
-}
-`;
-
-export const fs_2 = `
-precision highp float;
-
-// Uniforms
-uniform sampler2D uTexture0; // Output of shader 1
-uniform sampler2D uTexture1; // Previous frame output from shader 2
-uniform float uTime; // Time variable
-uniform float uFadeSpeed; // Fade speed
-uniform float uBlurFraction; // Blur fraction
-
-// Varying from vertex shader
-varying vec2 vTexCoord;
-
-// For blurring
-const float Directions = 8.0;
-const float Quality = 1.0;
-const float Radius = 1.0 / 1200.0;
-float pixelCount = 1.0;
-
-void main() {
-    vec2 texcoord = vTexCoord; 
-    
-    vec4 blurred = texture2D(uTexture1, texcoord); 
-    for (float d = 0.0; d < 6.3; d += 6.3 / Directions) {
-        for (float i = 1.0 / Quality; i <= 1.0; i += 1.0 / Quality) {
-            blurred += texture2D(uTexture1, texcoord + vec2(cos(d), sin(d)) * Radius * i); 
-            pixelCount += 1.0;
-        }
-    }
-    blurred /= pixelCount;      
-
-    vec4 shader1Out = texture2D(uTexture0, texcoord); 
-    vec4 prevFrame = texture2D(uTexture1, texcoord); 
-
-    blurred = prevFrame * (1.0 - uBlurFraction) + blurred * uBlurFraction;
-    
-    gl_FragColor = shader1Out + blurred * (1.0 - uFadeSpeed) - 0.0001;
-}
-`;
+    `;

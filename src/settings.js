@@ -1,3 +1,5 @@
+export const RANDOM = 0;
+
 export const CANVAS = {
     WIDTH: window.innerWidth,
     HEIGHT: window.innerHeight,
@@ -9,30 +11,19 @@ export const COLOR = {
     WHITE: 255,
 };
 
-export const PHYSARUM = {
-    NUM_AGENTS: 10000,
+export const PARAMS = {
+    NUM_AGENTS: 100000,
+    POS_COMPONENTS: 4,
+    STARTING_ARRANGEMENT: RANDOM,
+    SENSOR_ANGLE: 20,
+    SENSOR_DISTANCE: 20,
+    ROTATION_ANGLE: 45,
+    RANDOM_DIR: true,
+    STEP_SIZE: 2,
+    POINT_SIZE: 1,
 
-    DECAY_RATE: 0.02,
-    DIFFUSE_RATE: 0.8,
-    SENSE_ANGLE: Math.PI / 4,
-    STEER_STRENGTH: 0.05,
-    SENSE_DISTANCE_RATIO: 0.0032,
-    SPEED_RATIO: 0.00032,
-    MAX_TRAIL_DENSITY: 1,
-    DENSITY_SPEED: 0.5,
-    SENSOR_SIZE: 1,
-    SPEED_AFFECTED_BY_TRAIL_DENSITY: true,
-    DELTA_TIME: 0.01,
-    WALL_STRATEGY: {
-        WRAP: 0,
-        BOUNCE: 1,
-    },
-    COLOR_STRATEGY: {
-        POSITION: 0,
-        DIRECTION: 1,
-        GRAY: 2,
-        SPEED: 3,
-    },
-    FADE_SPEED: 0.05,
-    BLUR_FRACTION: 1.0,
+    DEPOSIT_AMOUNT: 2,
+    DECAY_FACTOR: 0.9,
+
+    RENDER_AMPLITUDE: 0.23,
 };
