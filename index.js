@@ -18,4 +18,4 @@ const glslVersion = webGLSettings.GLSLVersion === "GLSL 3" ? GLSL3 : GLSL1;
 const physarum = sketch(contextID, glslVersion, PARAMS);
 
 physarum.init();
-physarum.draw();
+physarum.update();

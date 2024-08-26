@@ -3,7 +3,7 @@ in vec2 v_uv;
 
 #define TWO_PI 6.28318530718
 
-uniform sampler2D u_agentsHeading;
+uniform sampler2D u_agentsDirection;
 uniform sampler2D u_agentsPositions;
 uniform sampler2D u_trail;
 uniform vec2 u_dimensions;
@@ -13,7 +13,7 @@ uniform float u_rotationAngle;
 uniform bool u_randomDir;
 uniform float u_stepSize;
 
-layout (location = 0) out float out_heading; // Output at index 0.
+layout (location = 0) out float out_direction; // Output at index 0.
 layout (location = 1) out vec4 out_position; // Output at index 1.
 
 float sense(vec2 position, float angle) {
@@ -22,7 +22,7 @@ float sense(vec2 position, float angle) {
 }
 
 void main() {
-    float heading = texture(u_agentsHeading, v_uv).r;
+    float direction = texture(u_agentsDirection, v_uv).r;
 
     // Add absolute position plus displacement to get position.
     vec4 positionInfo = texture(u_agentsPositions, v_uv);
@@ -34,36 +34,36 @@ void main() {
     vec2 trailUV = position / u_dimensions;
 
     // Sense and rotate.
-    float middleState = sense(position, heading);
-    float leftState = sense(position, heading + u_sensorAngle);
-    float rightState = sense(position, heading - u_sensorAngle);
+    float middleState = sense(position, direction);
+    float leftState = sense(position, direction + u_sensorAngle);
+    float rightState = sense(position, direction - u_sensorAngle);
     // Using some tricks here to remove conditionals (they cause significant slowdowns).
     // Leaving the old code here for clarity, replaced by the lines below.
         // if (middleState > rightState && middleState < leftState) {
         // 	// Rotate left.
-        // 	heading += u_rotationAngle;
+        // 	direction += u_rotationAngle;
         // } else if (middleState < rightState && middleState > leftState) {
         // 	// Rotate right.
-        // 	heading -= u_rotationAngle;
+        // 	direction -= u_rotationAngle;
         // } else if (middleState < rightState && middleState < leftState) {
         // 	// Choose randomly.
-        // 	heading += u_rotationAngle * (u_randomDir ? 1.0 : -1.0);
+        // 	direction += u_rotationAngle * (u_randomDir ? 1.0 : -1.0);
         // } // else do nothing.
     // The following lines give the same result without conditionals.
     float rightWeight = step(middleState, rightState);
     float leftWeight = step(middleState, leftState);
-    heading += mix(
+    direction += mix(
         rightWeight * mix(u_rotationAngle, -u_rotationAngle, float(u_randomDir)),
         mix(u_rotationAngle, -u_rotationAngle, rightWeight),
         abs(leftWeight - rightWeight)
     );
 
-    // Wrap heading around 2PI.
-    heading = mod(heading + TWO_PI, TWO_PI);
-    out_heading = heading;
+    // Wrap direction around 2PI.
+    direction = mod(direction + TWO_PI, TWO_PI);
+    out_direction = direction;
 
-    // Move in direction of heading.
-    vec2 move = u_stepSize * vec2(cos(heading), sin(heading));
+    // Move in direction of direction.
+    vec2 move = u_stepSize * vec2(cos(direction), sin(direction));
     vec2 nextDisplacement = displacement + move;
     
     // If displacement is large enough, merge with abs position.
@@ -85,6 +85,7 @@ void main() {
         // 		absolute.y = absolute.y - u_dimensions.y;
         // 	}
         // }
+    
     // The following lines give the same result without conditionals.
     float shouldMerge = step(30.0, dot(nextDisplacement, nextDisplacement));
     absolute = mod(absolute + shouldMerge * nextDisplacement + u_dimensions, u_dimensions);

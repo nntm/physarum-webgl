@@ -171,7 +171,7 @@ export const sketch = (contextID, glslVersion, params) => {
             uniforms: [
                 {
                     // Index of agentsHeading GPULayer in "input" array.
-                    name: "u_agentsHeading",
+                    name: "u_agentsDirection",
                     value: 0,
                     type: INT,
                 },
@@ -290,7 +290,7 @@ export const sketch = (contextID, glslVersion, params) => {
 
     /*-------------------*/
 
-    const draw = () => {
+    const update = () => {
         window.requestAnimationFrame(draw);
 
         if (RANDOM_DIR)
@@ -324,5 +324,5 @@ export const sketch = (contextID, glslVersion, params) => {
         });
     };
 
-    return { init, draw };
+    return { init, update };
 };
