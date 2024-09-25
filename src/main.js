@@ -7,32 +7,34 @@ import {
     FLOAT,
     REPEAT,
     LINEAR,
+    NEAREST,
     addValueProgram,
     renderAmplitudeProgram,
+    CLAMP_TO_EDGE,
 } from "gpu-io";
-import { CANVAS, RANDOM } from "./settings";
+import { CANVAS } from "./settings";
 import { updateAgents_frag, diffuseAndDecay_frag } from "./shader";
 import { randomBoolean } from "./utils";
 
 /*-----------------------------------------------------------------------*/
 
-let canvas;
-
-let agents;
-
-let composer;
-let posLayer, dirLayer, updateAgentsProgram;
-let trailLayer, depositProgram, diffuseAndDecayProgram;
-let renderer;
-
 /*-----------------------------------------------------------------------*/
 
 export const sketch = (contextID, glslVersion, params) => {
+    let canvas;
+
+    let agents;
+
+    let composer;
+    let posLayer, dirLayer, updateAgentsProgram;
+    let trailLayer, depositProgram, diffuseAndDecayProgram;
+    let renderer;
+
     const NUM_AGENTS = params.NUM_AGENTS;
     const POS_COMPONENTS = params.POS_COMPONENTS;
     const STARTING_ARRANGEMENT = params.STARTING_ARRANGEMENT;
     const SENSOR_ANGLE = params.SENSOR_ANGLE;
-    const SENSOR_DISTANCE = params.SENSOR_DISTANCE;
+    const SENSOR_DISTANCE_FACTOR = params.SENSOR_DISTANCE_FACTOR;
     const ROTATION_ANGLE = params.ROTATION_ANGLE;
     const RANDOM_DIR = params.RANDOM_DIR;
     const STEP_SIZE = params.STEP_SIZE;
@@ -66,7 +68,7 @@ export const sketch = (contextID, glslVersion, params) => {
             dirArray: new Float32Array(NUM_AGENTS),
         };
 
-        initArrangements_Origin();
+        initArrangements_Random();
 
         // The composer orchestrates all of the GPU operations.
         initComposer();
@@ -80,62 +82,60 @@ export const sketch = (contextID, glslVersion, params) => {
 
     const initArrangements_Random = () => {
         for (let i = 0; i < NUM_AGENTS; i++) {
-            agents.posArray[POS_COMPONENTS * i] = Math.random() * CANVAS.WIDTH;
+            // Random absolute position
+            agents.posArray[POS_COMPONENTS * i] = Math.random() * CANVAS.WIDTH; // x
             agents.posArray[POS_COMPONENTS * i + 1] =
-                Math.random() * CANVAS.HEIGHT;
+                Math.random() * CANVAS.HEIGHT; // y
 
-            agents.dirArray[i] = Math.random() * Math.PI * 2;
+            // Initial displacement is zero
+            agents.posArray[POS_COMPONENTS * i + 2] = 0; // z (displacement)
+            agents.posArray[POS_COMPONENTS * i + 3] = 0; // w (displacement)
+
+            const direction = Math.random() * Math.PI * 2;
+            agents.dirArray[i] = direction;
         }
     };
 
     const initArrangements_Ring = () => {
-        // var a = (index * Math.PI * 2) / (n * 4); // angle
-        // var d = 0.7; //Math.random()*0.7; // dist to center
-        // var x = Math.sin(a) * d;
-        // var y = -Math.cos(a) * d;
-        // if (index % 4 == 0) {
-        //     return x;
-        // } //x
-        // if (index % 4 == 1) {
-        //     return y;
-        // }
-        // if (index % 4 == 3) {
-        //     return 1 + (a + Math.PI / 2) / 1000;
-        // } // direction
+        const centerX = CANVAS.WIDTH / 4;
+        const centerY = CANVAS.HEIGHT / 2;
+        const radius = Math.min(CANVAS.WIDTH, CANVAS.HEIGHT) * 0.3; // Ring radius
 
         for (let i = 0; i < NUM_AGENTS; i++) {
-            const angle = i * Math.PI * 2;
+            const angle = (i / NUM_AGENTS) * Math.PI * 2; // Evenly distribute around the circle
 
-            agents.posArray[POS_COMPONENTS * i] = Math.random() * CANVAS.WIDTH;
-            agents.posArray[POS_COMPONENTS * i + 1] =
-                Math.random() * CANVAS.HEIGHT;
+            const x = centerX + Math.cos(angle) * radius;
+            const y = centerY + Math.sin(angle) * radius;
 
-            agents.dirArray[i] = Math.random() * Math.PI * 2;
+            // Set absolute position on the ring
+            agents.posArray[POS_COMPONENTS * i] = x; // x position
+            agents.posArray[POS_COMPONENTS * i + 1] = y; // y position
+
+            // Initial displacement is zero
+            agents.posArray[POS_COMPONENTS * i + 2] = 0; // z (displacement)
+            agents.posArray[POS_COMPONENTS * i + 3] = 0; // w (displacement)
+
+            // Tangent direction to the circle
+            agents.dirArray[i] = angle + Math.PI / 2;
         }
     };
 
     const initArrangements_Origin = () => {
-        // var a = (index * Math.PI * 2) / (n * 4); // angle
-        // var x = 0;
-        // var y = 0;
-        // if (index % 4 == 0) {
-        //     return x;
-        // } //x
-        // if (index % 4 == 1) {
-        //     return y;
-        // }
-        // if (index % 4 == 3) {
-        //     return 1 + (a + Math.PI / 2) / 1000;
-        // } // direction
+        const centerX = CANVAS.WIDTH / 2;
+        const centerY = CANVAS.HEIGHT / 2;
 
         for (let i = 0; i < NUM_AGENTS; i++) {
-            const angle = Math.random() * Math.PI * 2;
+            const angle = Math.random() * Math.PI * 2; // Random direction
 
-            agents.posArray[POS_COMPONENTS * i] = CANVAS.WIDTH / 2;
-            agents.posArray[POS_COMPONENTS * i + 1] = CANVAS.HEIGHT / 2;
-            agents.posArray[POS_COMPONENTS * i + 2] = Math.random();
-            agents.posArray[POS_COMPONENTS * i + 3] = Math.random();
+            // All agents start at the center
+            agents.posArray[POS_COMPONENTS * i] = centerX; // x position
+            agents.posArray[POS_COMPONENTS * i + 1] = centerY; // y position
 
+            // Initial displacement is zero
+            agents.posArray[POS_COMPONENTS * i + 2] = 0; // z (displacement)
+            agents.posArray[POS_COMPONENTS * i + 3] = 0; // w (displacement)
+
+            // Random direction
             agents.dirArray[i] = angle;
         }
     };
@@ -199,7 +199,8 @@ export const sketch = (contextID, glslVersion, params) => {
                 },
                 {
                     name: "u_sensorDistance",
-                    value: SENSOR_DISTANCE,
+                    value:
+                        SENSOR_DISTANCE_FACTOR * (CANVAS.WIDTH + CANVAS.HEIGHT),
                     type: FLOAT,
                 },
                 {
@@ -241,8 +242,8 @@ export const sketch = (contextID, glslVersion, params) => {
             type: FLOAT,
             filter: LINEAR,
             numBuffers: 2,
-            wrapX: REPEAT,
-            wrapY: REPEAT,
+            wrapX: CLAMP_TO_EDGE,
+            wrapY: CLAMP_TO_EDGE,
         });
     };
 
@@ -279,6 +280,53 @@ export const sketch = (contextID, glslVersion, params) => {
         });
     };
 
+    const renderPalette = (
+        composer,
+        defaultAmplitude = 1,
+        defaultPalette = 0,
+        components = "x"
+    ) => {
+        return new GPUProgram(composer, {
+            name: "renderPalette",
+            fragmentShader: `
+in vec2 v_uv;
+uniform sampler2D u_state;
+uniform float u_amplitude;
+uniform int u_palette;
+out vec4 out_color;
+
+const vec3 table[4] = vec3[4](vec3(1,0.5,0.5),vec3(0.5,0.5,0.5),vec3(1.0,1.0,1.0),vec3(0.0,0.33,0.67));
+
+vec3 pal(in float t,in int i) {
+    vec3 a = table[i * 4];
+    vec3 b = table[i * 4 + 1];
+    vec3 c = table[i * 4 + 2];
+    vec3 d = table[i * 4 + 3];
+
+    return a + b * cos(6.28318 * (c * t + d));
+}
+
+void main() {
+    float val = u_amplitude * texture(u_state, v_uv).x;
+    vec3 col = pal(val, u_palette);
+    out_color = vec4(col, 1);
+}
+		`,
+            uniforms: [
+                {
+                    name: "u_amplitude",
+                    value: defaultAmplitude,
+                    type: FLOAT,
+                },
+                {
+                    name: "u_palette",
+                    value: defaultPalette,
+                    type: INT,
+                },
+            ],
+        });
+    };
+
     const initRenderer = () => {
         renderer = renderAmplitudeProgram(composer, {
             name: "renderer",
@@ -286,12 +334,18 @@ export const sketch = (contextID, glslVersion, params) => {
             components: "x",
             scale: RENDER_AMPLITUDE,
         });
+
+        renderer = renderPalette(
+            composer,
+            RENDER_AMPLITUDE,
+            Math.floor(Math.random() * 1)
+        );
     };
 
     /*-------------------*/
 
     const update = () => {
-        window.requestAnimationFrame(draw);
+        window.requestAnimationFrame(update);
 
         if (RANDOM_DIR)
             updateAgentsProgram.setUniform("u_randomDir", randomBoolean());
@@ -308,8 +362,8 @@ export const sketch = (contextID, glslVersion, params) => {
             input: trailLayer,
             output: trailLayer,
             pointSize: POINT_SIZE,
-            wrapX: true,
-            wrapY: true,
+            wrapX: CLAMP_TO_EDGE,
+            wrapY: CLAMP_TO_EDGE,
         });
 
         composer.step({

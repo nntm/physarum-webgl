@@ -1,4 +1,4 @@
-export const RANDOM = 0;
+import { random, randomBoolean } from "./utils";
 
 export const CANVAS = {
     WIDTH: window.innerWidth,
@@ -12,18 +12,18 @@ export const COLOR = {
 };
 
 export const PARAMS = {
-    NUM_AGENTS: 100000,
+    NUM_AGENTS: 2000000,
     POS_COMPONENTS: 4,
-    STARTING_ARRANGEMENT: RANDOM,
-    SENSOR_ANGLE: 20,
-    SENSOR_DISTANCE: 30,
-    ROTATION_ANGLE: 5,
+    STARTING_ARRANGEMENT: 0,
+    SENSOR_ANGLE: 60,
+    SENSOR_DISTANCE_FACTOR: 0.008,
+    ROTATION_ANGLE: 60,
     RANDOM_DIR: true,
-    STEP_SIZE: 6,
+    STEP_SIZE: 8,
     POINT_SIZE: 1,
 
     DEPOSIT_AMOUNT: 2,
-    DECAY_FACTOR: 0.8,
+    DECAY_FACTOR: 0.88,
 
-    RENDER_AMPLITUDE: 0.13,
+    RENDER_AMPLITUDE: 0.12,
 };
